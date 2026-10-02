@@ -82,13 +82,15 @@ jobs:
             echo "::error::APK has no verifiable signing certificate — refusing to publish"
             exit 1
           }
-          echo "OVE_SIGNER_SHA256=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/certs.txt | head -1)" >> "$GITHUB_ENV"
+          echo "OVE_SIGNER_SHA256=$(sed -n 's/.*certificate SHA-256 digest: //p' /tmp/certs.txt | head -1)" >> "$GITHUB_ENV"
 
       - name: Checksums + metadata
         run: |
-          mkdir -p dist
-          cp app/build/outputs/apk/release/*.apk dist/ 2>/dev/null || true
-          cp app/build/outputs/bundle/release/*.aab dist/ 2>/dev/null || true
+          # Fresh dist dir: stale committed artifacts must never ride into a
+          # release (v0.1.1 lesson — an old unsigned APK leaked onto the page).
+          rm -rf dist && mkdir -p dist
+          cp app/build/outputs/apk/release/*.apk dist/
+          cp app/build/outputs/bundle/release/*.aab dist/
           cd dist
           sha256sum * > SHA256SUMS.txt
           {

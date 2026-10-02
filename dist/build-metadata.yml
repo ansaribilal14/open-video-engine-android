@@ -1,5 +1,0 @@
-source_commit: 95307855d8896b4352064711f7bd172a77db116b
-engine_pin: 06c92496f7051f15069663296ec51e88e170fe18
-bridge_version: 0.1.0
-app_version: 0.1.0
-libav: FFmpeg 7.1.1 LGPL (aarch64, static)

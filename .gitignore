@@ -6,6 +6,7 @@ local.properties
 .idea/
 captures/
 app/build/
+dist/
 
 # Rust / bridge
 bridge/target/
