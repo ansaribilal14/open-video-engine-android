@@ -24,7 +24,7 @@ class RationalValueTest {
 
     @Test
     fun normalization_reduces() {
-        val r = RationalValue(168, 24) // 7
+        val r = RationalValue(168, 24).reduced // 7
         assertEquals(7L, r.num)
         assertEquals(1L, r.den)
     }

@@ -6,34 +6,39 @@ import kotlinx.serialization.Serializable
  *  engine boundary. Floats are never sent to the engine (P-5). */
 @Serializable
 data class RationalValue(val num: Long, val den: Long) {
+    init {
+        // canonical form: reduced, positive denominator (engine Rational semantics)
+        require(den != 0L) { "zero denominator" }
+    }
+
     /** UI display only — never sent back to the engine. */
     fun secondsDouble(): Double = num.toDouble() / den.toDouble()
 
     fun isZero(): Boolean = num == 0L
 
+    private val gcd: Long = {
+        var x = if (num < 0) -num else num
+        var y = if (den < 0) -den else den
+        while (y != 0L) { val t = x % y; x = y; y = t }
+        if (x == 0L) 1L else x
+    }()
+
+    /** Canonical reduced form (lazy: termination via lazy evaluation). */
+    val reduced: RationalValue by lazy {
+        val sign = if (den < 0) -1L else 1L
+        RationalValue(sign * num / gcd, sign * den / gcd)
+    }
+
     fun add(other: RationalValue): RationalValue {
         val n = num * other.den + other.num * den
         val d = den * other.den
-        return RationalValue(n, d).normalized()
+        return RationalValue(n, d).reduced
     }
 
     fun sub(other: RationalValue): RationalValue {
         val n = num * other.den - other.num * den
         val d = den * other.den
-        return RationalValue(n, d).normalized()
-    }
-
-    private fun normalized(): RationalValue {
-        if (den == 0L) return this
-        var n = num
-        var d = den
-        if (d < 0) { n = -n; d = -d }
-        val a = if (n < 0) -n else n
-        var x = a
-        var y = d
-        while (y != 0L) { val t = x % y; x = y; y = t }
-        val g = if (a == 0L) d else x
-        return if (g > 1L) RationalValue(n / g, d / g) else RationalValue(n, d)
+        return RationalValue(n, d).reduced
     }
 
     companion object {
