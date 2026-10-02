@@ -1,0 +1,25 @@
+[package]
+name = "ove-android"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "JNI bridge exposing the ove-engine headless session to the Android client (engine client — zero engine code)."
+
+[lib]
+name = "oveandroid"
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+jni = "0.21"
+serde_json = "1"
+# Engine dependency: pinned by fetch-engine.sh to the recorded commit.
+# The engine repo is a read-only dependency; its crates are consumed exactly
+# as ove-cli/ove-mcp consume them (path deps into the checkout).
+ove-engine = { path = "engine-checkout/engine/ove-engine" }
+ove-time = { path = "engine-checkout/engine/ove-time" }
+ove-media = { path = "engine-checkout/engine/ove-media" }
+ove-timeline = { path = "engine-checkout/engine/ove-timeline" }
+ove-render = { path = "engine-checkout/engine/ove-render" }
+
+[dev-dependencies]
+sha2 = "0.10"
