@@ -20,12 +20,22 @@ sh "$BRIDGE/fetch-engine.sh"
 rustup target add aarch64-linux-android
 
 # 3. build (ffmpeg-sys-next discovers the Android FFmpeg prefix)
-export LIBCLANG_PATH="${LIBCLANG_PATH:-$TC/../lib/clang}"
+# libclang for bindgen: prefer an explicitly provided path, then the
+# NDK's bundled libclang, then the unprivileged deb-extracted llvm-19.
+if [ -z "${LIBCLANG_PATH:-}" ]; then
+    if ls "$TC"/../lib64/libclang* >/dev/null 2>&1; then
+        export LIBCLANG_PATH="$TC/../lib64"
+    elif [ -d "$HOME/my-project/ffmpeg-dev/usr/lib/llvm-19/lib" ]; then
+        export LIBCLANG_PATH="$HOME/my-project/ffmpeg-dev/usr/lib/llvm-19/lib"
+    fi
+fi
 export AR_aarch64_linux_android="$TC/llvm-ar"
 export CC_aarch64_linux_android="$TC/aarch64-linux-android${API}-clang"
 export CXX_aarch64_linux_android="$TC/aarch64-linux-android${API}-clang++"
 export RANLIB_aarch64_linux_android="$TC/llvm-ranlib"
-export BINDGEN_EXTRA_CLANG_ARGS="--sysroot=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot -I$FFPREFIX/include"
+# clang builtin headers (stddef.h etc.) come from the NDK's clang resource dir
+CLANG_RES="$TC/../lib/clang/18/include"
+export BINDGEN_EXTRA_CLANG_ARGS="--sysroot=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot -I$FFPREFIX/include -I$CLANG_RES"
 export FFMPEG_DIR="$FFPREFIX"
 export PKG_CONFIG_ALLOW_CROSS=1
 export PKG_CONFIG_PATH="$FFPREFIX/lib/pkgconfig"
