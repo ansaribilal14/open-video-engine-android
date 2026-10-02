@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
+      PREFIX: /tmp/ffmpega64
       FFPREFIX: /tmp/ffmpega64
     steps:
       - uses: actions/checkout@v4
