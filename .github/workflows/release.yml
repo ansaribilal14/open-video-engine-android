@@ -53,8 +53,36 @@ jobs:
       - name: Fetch engine at pinned commit + build JNI bridge
         run: sh scripts/build-bridge-android.sh
 
+      - name: Restore release keystore from secrets (never committed)
+        env:
+          KS_B64: ${{ secrets.OVE_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > /tmp/ove-release.keystore
+            echo "OVE_KEYSTORE_PATH=/tmp/ove-release.keystore" >> "$GITHUB_ENV"
+            echo "release keystore restored (signing: release key)"
+          else
+            echo "no keystore secret present — build falls back to debug signing (installable, recorded honestly)"
+          fi
+
       - name: Release build (APK + AAB)
+        env:
+          OVE_KEYSTORE_PASSWORD: ${{ secrets.OVE_ANDROID_KEYSTORE_PASSWORD }}
+          OVE_KEY_ALIAS: ${{ secrets.OVE_ANDROID_KEY_ALIAS }}
+          OVE_KEY_PASSWORD: ${{ secrets.OVE_ANDROID_KEY_PASSWORD }}
         run: ./gradlew assembleRelease bundleRelease --no-daemon
+
+      - name: Verify APK signature (never publish unsigned — v0.1.0 lesson)
+        run: |
+          APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+          APK=$(ls app/build/outputs/apk/release/*.apk)
+          echo "verifying: $APK"
+          "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/certs.txt
+          grep -q 'certificate SHA-256 digest' /tmp/certs.txt || {
+            echo "::error::APK has no verifiable signing certificate — refusing to publish"
+            exit 1
+          }
+          echo "OVE_SIGNER_SHA256=$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' /tmp/certs.txt | head -1)" >> "$GITHUB_ENV"
 
       - name: Checksums + metadata
         run: |
@@ -69,6 +97,9 @@ jobs:
             echo "bridge_version: 0.1.0"
             echo "app_version: ${GITHUB_REF_NAME#v}"
             echo "libav: FFmpeg 7.1.1 LGPL (aarch64)"
+            echo "signer_sha256: ${OVE_SIGNER_SHA256:-unverified}"
+            echo "abi: arm64-v8a"
+            echo "min_sdk: 26 (Android 8.0)"
           } > build-metadata.yml
 
       - name: Publish GitHub Release
@@ -80,4 +111,6 @@ jobs:
 
             - Engine dependency: open-video-engine @ 06c9249 (code-identical to v0.2.0)
             - libav: FFmpeg 7.1.1, LGPL configuration, arm64-v8a
-            - Verify with SHA256SUMS.txt (sha256sum -c)
+            - APK is **signed** (release keystore held in CI secrets, never committed)
+            - Requires Android 8.0+ (minSdk 26), arm64-v8a device
+            - Verify with SHA256SUMS.txt (sha256sum -c); signer fingerprint in build-metadata.yml

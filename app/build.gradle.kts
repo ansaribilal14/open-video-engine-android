@@ -13,11 +13,29 @@ android {
         applicationId = "app.ove.studio"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
         ndk {
             // v0.1.0 build target (docs/ENGINE_INTEGRATION_AUDIT.md §13.3)
             abiFilters += listOf("arm64-v8a")
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            // The release keystore is provisioned by CI via repo secrets
+            // (OVE_ANDROID_KEYSTORE_BASE64/PASSWORD/ALIAS/KEY_PASSWORD) and is
+            // deliberately NEVER committed (charter rule). When the env is
+            // absent (local builds, forks) nothing is configured here and the
+            // release build type falls back to the debug key below — an
+            // unsigned APK (uninstallable, v0.1.0 lesson) is never produced.
+            val ksPath = System.getenv("OVE_KEYSTORE_PATH")
+            if (ksPath != null) {
+                storeFile = file(ksPath)
+                storePassword = System.getenv("OVE_KEYSTORE_PASSWORD") ?: ""
+                keyAlias = System.getenv("OVE_KEY_ALIAS") ?: ""
+                keyPassword = System.getenv("OVE_KEY_PASSWORD") ?: ""
+            }
         }
     }
 
@@ -25,6 +43,14 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            val ksPath = System.getenv("OVE_KEYSTORE_PATH")
+            signingConfig = if (ksPath != null && file(ksPath).exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                // Installable fallback (debug-signed); CI verifies + records
+                // the actual signer either way.
+                signingConfigs.getByName("debug")
+            }
         }
     }
     compileOptions {
