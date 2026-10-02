@@ -12,13 +12,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalDensity
@@ -29,8 +33,10 @@ import app.ove.studio.editor.EditorState
 import app.ove.studio.editor.EditorViewModel
 import app.ove.studio.engine.OveClip
 import app.ove.studio.engine.RationalValue
+import app.ove.studio.ui.theme.OveClipGradEnd
+import app.ove.studio.ui.theme.OveClipGradStart
+import app.ove.studio.ui.theme.OvePlayheadCore
 import app.ove.studio.ui.theme.TimelineMetrics
-import app.ove.studio.ui.theme.editorClipColor
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -61,13 +67,21 @@ fun TimelineView(
     val density = LocalDensity.current
     val currentState by rememberUpdatedState(state)
     val viewModelStable = rememberUpdatedState(viewModel)
-    val clipFill = editorClipColor()
     val outlineColor = MaterialTheme.colorScheme.outline
     val selectionColor = MaterialTheme.colorScheme.primary
     val playheadColor = MaterialTheme.colorScheme.error
     val rulerTick = MaterialTheme.colorScheme.onSurfaceVariant
     val laneWell = MaterialTheme.colorScheme.surfaceContainerHigh
     val audioBadge = MaterialTheme.colorScheme.tertiary
+
+    // ruler time labels (m:ss) — drawn on the native canvas above ticks
+    val rulerLabelPaint = remember(rulerTick, density) {
+        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = rulerTick.copy(alpha = 0.95f).toArgb()
+            textSize = with(density) { 9.dp.toPx() }
+            isFakeBoldText = true
+        }
+    }
 
     val rulerPx = with(density) { TimelineMetrics.rulerHeight.dp.toPx() }
     val trackPitchPx = with(density) { TimelineMetrics.trackPitch.dp.toPx() }
@@ -151,6 +165,14 @@ fun TimelineView(
                         Offset(x, rulerPx),
                         strokeWidth = if (major) 2f else 1f,
                     )
+                    if (major && t > 0) {
+                        drawContext.canvas.nativeCanvas.drawText(
+                            "${t / 60}:${(t % 60).toString().padStart(2, '0')}",
+                            x + 5f,
+                            rulerPx * 0.62f,
+                            rulerLabelPaint,
+                        )
+                    }
                 }
                 t++
             }
@@ -170,8 +192,15 @@ fun TimelineView(
                         if (x + w < 0f || x > width) return@forEachIndexed
                         val y = laneTop + clipMarginPx
                         val h = trackPitchPx - 2 * clipMarginPx
+                        // vivid clip gradient (display-only styling; the engine
+                        // boundary never sees pixels)
+                        val clipBrush = Brush.horizontalGradient(
+                            listOf(OveClipGradStart, OveClipGradEnd),
+                            x,
+                            x + max(w, 1f),
+                        )
                         drawRoundRect(
-                            color = clipFill,
+                            brush = clipBrush,
                             topLeft = Offset(x, y),
                             size = Size(w, h),
                             cornerRadius = CornerRadius(10f, 10f),
@@ -210,10 +239,16 @@ fun TimelineView(
                 }
             }
 
-            // playhead — highest-contrast element in the timeline
+            // playhead — highest-contrast element: accent glow + white core
             val px = secToPx(playSec, origin, width)
             if (px >= -2f && px <= width + 2f) {
-                drawLine(playheadColor, Offset(px, 0f), Offset(px, height), strokeWidth = 3f)
+                drawLine(
+                    selectionColor.copy(alpha = 0.28f),
+                    Offset(px, 0f),
+                    Offset(px, height),
+                    strokeWidth = 9f,
+                )
+                drawLine(OvePlayheadCore, Offset(px, 0f), Offset(px, height), strokeWidth = 2.5f)
                 drawCircle(playheadColor, radius = 6f, center = Offset(px, rulerPx * 0.5f))
             }
         }

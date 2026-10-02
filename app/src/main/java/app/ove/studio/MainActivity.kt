@@ -16,6 +16,7 @@ import app.ove.studio.home.HomeScreen
 import app.ove.studio.home.HomeViewModel
 import app.ove.studio.settings.SettingsScreen
 import app.ove.studio.ui.theme.OveTheme
+import java.io.File
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,7 +37,7 @@ fun OveApp(client: OveClient) {
         composable("home") {
             val ctx = androidx.compose.ui.platform.LocalContext.current
             val vm: HomeViewModel = androidx.lifecycle.viewmodel.compose.viewModel(
-                factory = HomeViewModel.Factory(ctx.applicationContext),
+                factory = HomeViewModel.Factory(ctx.applicationContext, client),
             )
             HomeScreen(
                 viewModel = vm,
@@ -59,15 +60,23 @@ fun OveApp(client: OveClient) {
                 factory = EditorViewModel.Factory(client, application),
                 key = entry.arguments?.getString("dir"),
             )
+            val projectDir = (entry.arguments?.getString("dir").orEmpty()).let { d ->
+                val registry = app.ove.studio.project.ProjectRegistry(application)
+                registry.dirFor(
+                    app.ove.studio.project.ProjectEntry(d, d, 0L, 0L),
+                ).absolutePath
+            }
+            // v0.1.2 self-heal: a project whose engine folder is missing
+            // (legacy interrupted create) is RECREATED by opening it — the
+            // folder genuinely doesn't exist, so Engine::create is valid.
+            // "Engine folder missing" is no longer a dead-end state.
+            val needsCreate = remember(projectDir) {
+                (entry.arguments?.getString("new") == "true") || !File(projectDir).exists()
+            }
             EditorScreen(
                 projectName = entry.arguments?.getString("name").orEmpty(),
-                projectDir = (entry.arguments?.getString("dir").orEmpty()).let { d ->
-                    val registry = app.ove.studio.project.ProjectRegistry(application)
-                    registry.dirFor(
-                        app.ove.studio.project.ProjectEntry(d, d, 0L, 0L),
-                    ).absolutePath
-                },
-                isNew = entry.arguments?.getString("new") == "true",
+                projectDir = projectDir,
+                needsCreate = needsCreate,
                 viewModel = vm,
                 onBack = { nav.popBackStack() },
                 onOpenSettings = { nav.navigate("settings") },

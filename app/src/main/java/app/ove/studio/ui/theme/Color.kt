@@ -21,13 +21,24 @@ val OveOnSurfaceVariantDark = Color(0xFFA9AAB4)
 val OveOutlineDark = Color(0xFF3C3F4A)
 val OveClipVideoDark = Color(0xFF2E4A73)
 
+// v0.1.2 — accent system (CapCut-grade): teal-cyan primary + cyan→blue CTA
+// gradient + vivid timeline clip gradient. Editor surfaces stay neutral so
+// video frames keep their fidelity (docs/UI_SYSTEM.md §10).
+val OveAccentDark = Color(0xFF22E5CE)
+val OveOnAccentDark = Color(0xFF062A26)
+val OveGradientStartDark = Color(0xFF2BE0C8)
+val OveGradientEndDark = Color(0xFF2E7CF6)
+val OveClipGradStart = Color(0xFF3B82F6)
+val OveClipGradEnd = Color(0xFF22D3EE)
+val OvePlayheadCore = Color(0xFFFFFFFF)
+
 // Light theme (home/settings follow system)
 val OveBackgroundLight = Color(0xFFFAFAFC)
 val OveSurfaceLight = Color(0xFFFFFFFF)
 val OveSurfaceContainerLight = Color(0xFFF0F0F4)
 val OveSurfaceContainerHighLight = Color(0xFFE6E6EC)
 val OveSurfaceVariantLight = Color(0xFFE2E2E8)
-val OvePrimaryLight = Color(0xFF3659A6)
+val OvePrimaryLight = Color(0xFF0B8C7F)
 val OveOnPrimaryLight = Color(0xFFFFFFFF)
 val OveSecondaryLight = Color(0xFF4A6080)
 val OveTertiaryLight = Color(0xFF2E6B5E)

@@ -3,16 +3,25 @@ package app.ove.studio.editor
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.Warning
@@ -25,6 +34,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -34,7 +44,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.ove.studio.editor.components.ClipContextBar
@@ -47,16 +63,17 @@ import app.ove.studio.ui.theme.Spacing
 import java.io.File
 
 /**
- * The editor workspace: preview → transport → timeline → context bar.
- * Forced-dark (docs/UI_SYSTEM.md §10). Import uses the system photo/video
- * picker; staged copies are handed to the engine and deleted afterwards.
+ * The editor workspace: preview → transport → timeline → context bar →
+ * CapCut-style bottom action bar (icon + label columns; ONLY operations the
+ * engine actually supports — no dead controls, ever). Forced-dark
+ * (docs/UI_SYSTEM.md §10).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditorScreen(
     projectName: String,
     projectDir: String,
-    isNew: Boolean,
+    needsCreate: Boolean,
     viewModel: EditorViewModel,
     onBack: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -76,7 +93,7 @@ fun EditorScreen(
     }
 
     LaunchedEffect(projectDir) {
-        if (isNew) viewModel.createAndOpen(projectDir, projectName)
+        if (needsCreate) viewModel.createAndOpen(projectDir, projectName)
         else viewModel.open(projectDir, projectName)
     }
 
@@ -94,20 +111,18 @@ fun EditorScreen(
                 TopAppBar(
                     title = {
                         Column {
-                            Text(projectName, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                projectName,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                             if (state.shape?.multi_source_limit == true) {
-                                Row {
-                                    Icon(
-                                        Icons.Filled.Info, contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 2.dp),
-                                    )
-                                    Text(
-                                        "renders first source (engine v1)",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
+                                Text(
+                                    "renders first source (engine v1)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
                     },
@@ -115,28 +130,27 @@ fun EditorScreen(
                         TextButton(onClick = onBack) { Text("Projects") }
                     },
                     actions = {
-                        IconButton(
-                            onClick = { viewModel.undo() },
-                            enabled = state.canUndo,
-                        ) { Icon(Icons.Filled.Undo, contentDescription = "Undo") }
-                        IconButton(
-                            onClick = { viewModel.redo() },
-                            enabled = state.canRedo,
-                        ) { Icon(Icons.Filled.Redo, contentDescription = "Redo") }
-                        IconButton(
-                            onClick = {
-                                pickMedia.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly),
-                                )
-                            },
-                        ) { Icon(Icons.Filled.Add, contentDescription = "Import video") }
-                        IconButton(onClick = { showExport = true }) {
-                            Icon(Icons.Filled.IosShare, contentDescription = "Export")
-                        }
                         IconButton(onClick = onOpenSettings) {
                             Icon(Icons.Filled.Info, contentDescription = "Diagnostics")
                         }
                     },
+                )
+            },
+            bottomBar = {
+                EditorBottomBar(
+                    selected = state.selectedClipId != null,
+                    canUndo = state.canUndo,
+                    canRedo = state.canRedo,
+                    onImport = {
+                        pickMedia.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly),
+                        )
+                    },
+                    onSplit = { viewModel.splitSelectedAtPlayhead() },
+                    onDelete = { confirmDeleteClip = true },
+                    onUndo = { viewModel.undo() },
+                    onRedo = { viewModel.redo() },
+                    onExport = { showExport = true },
                 )
             },
         ) { padding ->
@@ -159,7 +173,17 @@ fun EditorScreen(
                     }
                 }
 
-                Box(Modifier.weight(1f)) {
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .padding(horizontal = Spacing.sm.dp, vertical = Spacing.xs.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .border(
+                            1.dp,
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                            RoundedCornerShape(14.dp),
+                        ),
+                ) {
                     PreviewPane(state, Modifier.fillMaxSize())
                 }
                 TransportBar(state, viewModel)
@@ -197,6 +221,81 @@ fun EditorScreen(
                 },
             )
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// CapCut-style bottom action bar — icon over label, one action per column.
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun EditorBottomBar(
+    selected: Boolean,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    onImport: () -> Unit,
+    onSplit: () -> Unit,
+    onDelete: () -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onExport: () -> Unit,
+) {
+    val accent = MaterialTheme.colorScheme.primary
+    val actions = listOf(
+        BottomAction(Icons.Filled.Add, "Import", enabled = true) { onImport() },
+        BottomAction(Icons.Filled.ContentCut, "Split", enabled = selected) { onSplit() },
+        BottomAction(Icons.Filled.Delete, "Delete", enabled = selected) { onDelete() },
+        BottomAction(Icons.Filled.Undo, "Undo", enabled = canUndo) { onUndo() },
+        BottomAction(Icons.Filled.Redo, "Redo", enabled = canRedo) { onRedo() },
+        BottomAction(Icons.Filled.IosShare, "Export", enabled = true, tint = accent) { onExport() },
+    )
+    Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .height(68.dp)
+                .padding(horizontal = Spacing.xs.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            actions.forEach { action ->
+                BottomItem(action, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+private data class BottomAction(
+    val icon: ImageVector,
+    val label: String,
+    val enabled: Boolean,
+    val tint: Color? = null,
+    val onClick: () -> Unit,
+)
+
+@Composable
+private fun BottomItem(action: BottomAction, modifier: Modifier = Modifier) {
+    val contentColor = action.tint ?: MaterialTheme.colorScheme.onSurface
+    Column(
+        modifier
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(enabled = action.enabled, onClick = action.onClick)
+            .padding(vertical = Spacing.xs.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            action.icon,
+            contentDescription = action.label,
+            tint = if (action.enabled) contentColor else contentColor.copy(alpha = 0.35f),
+            modifier = Modifier.size(22.dp),
+        )
+        Text(
+            action.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (action.enabled) contentColor else contentColor.copy(alpha = 0.35f),
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

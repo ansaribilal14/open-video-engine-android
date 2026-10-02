@@ -17,8 +17,8 @@ private val DarkScheme = darkColorScheme(
     surfaceContainerHigh = OveSurfaceContainerHighDark,
     surfaceVariant = OveSurfaceVariantDark,
     onSurfaceVariant = OveOnSurfaceVariantDark,
-    primary = OvePrimaryDark,
-    onPrimary = OveOnPrimaryDark,
+    primary = OveAccentDark,
+    onPrimary = OveOnAccentDark,
     secondary = OveSecondaryDark,
     tertiary = OveTertiaryDark,
     error = OveErrorDark,
@@ -74,3 +74,9 @@ fun clipVideoColor(): androidx.compose.ui.graphics.Color =
 /** Editor surfaces are always dark — convenience accessor. */
 @Composable
 fun editorClipColor(): androidx.compose.ui.graphics.Color = OveClipVideoDark
+
+/** v0.1.2 — signature cyan→blue gradient (CTAs, project thumbnails). */
+val oveAccentGradientBrush: androidx.compose.ui.graphics.Brush =
+    androidx.compose.ui.graphics.Brush.horizontalGradient(
+        listOf(OveGradientStartDark, OveGradientEndDark),
+    )

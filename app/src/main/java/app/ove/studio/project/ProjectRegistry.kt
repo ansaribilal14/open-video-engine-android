@@ -11,6 +11,13 @@ import java.io.File
  * manifest, log); the registry only remembers which folders the user created
  * and their display metadata (the engine has no project-listing API —
  * INTEGRATION_GAPS #9, client-side by design).
+ *
+ * v0.1.2 ordering fix ("Engine folder missing" dead-end): the registry never
+ * creates or deletes the project folder itself — the ENGINE creates it in
+ * Project::create (which asserts absence). Callers reserve a name with
+ * [nextDirName], run the engine create, and only then persist the row with
+ * [register]. A registry row therefore always corresponds to an engine
+ * project that existed at save time.
  */
 @Serializable
 data class ProjectEntry(
@@ -34,18 +41,29 @@ class ProjectRegistry(context: Context) {
         }.getOrDefault(emptyList()).sortedByDescending { it.lastOpenedMs }
     }
 
-    fun create(name: String): ProjectEntry {
-        val dirName = uniqueDirName(name)
+    /** Reserve a unique, filesystem-safe project folder name (no side effects). */
+    fun nextDirName(name: String): String {
+        val base = name.trim().replace(Regex("[^A-Za-z0-9_-]+"), "_").ifEmpty { "project" }
+        var candidate = "$base.ove"
+        var i = 2
+        while (list().any { it.dirName == candidate }) {
+            candidate = "$base-$i.ove"
+            i++
+        }
+        return candidate
+    }
+
+    /** The folder the engine will create for [dirName] (may not exist yet). */
+    fun dirForDirName(dirName: String): File = File(root, dirName)
+
+    /** Persist the row AFTER the engine project was created successfully. */
+    fun register(name: String, dirName: String): ProjectEntry {
         val entry = ProjectEntry(
             dirName = dirName,
             name = name,
             createdAtMs = System.currentTimeMillis(),
             lastOpenedMs = System.currentTimeMillis(),
         )
-        File(root, dirName).mkdirs() // engine will create the project inside its own subdir? No:
-        // the engine project IS this folder — Engine::create asserts absence,
-        // so the folder must not exist. Keep registry bookkeeping only:
-        File(root, dirName).delete()
         save(entry)
         return entry
     }
@@ -64,17 +82,6 @@ class ProjectRegistry(context: Context) {
     fun dirFor(entry: ProjectEntry): File = File(root, entry.dirName)
 
     fun storageBytes(): Long = root.walkBottomUp().filter { it.isFile }.sumOf { it.length() }
-
-    private fun uniqueDirName(name: String): String {
-        val base = name.trim().replace(Regex("[^A-Za-z0-9_-]+"), "_").ifEmpty { "project" }
-        var candidate = "$base.ove"
-        var i = 2
-        while (list().any { it.dirName == candidate }) {
-            candidate = "$base-$i.ove"
-            i++
-        }
-        return candidate
-    }
 
     private fun save(entry: ProjectEntry) {
         val all = list().toMutableList()
