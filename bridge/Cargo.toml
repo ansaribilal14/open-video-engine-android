@@ -20,6 +20,10 @@ ove-time = { path = "engine-checkout/engine/ove-time" }
 ove-media = { path = "engine-checkout/engine/ove-media" }
 ove-timeline = { path = "engine-checkout/engine/ove-timeline" }
 ove-render = { path = "engine-checkout/engine/ove-render" }
+# direct deps so CI can enable the engine's own `bundled` FFmpeg feature
+# (pkg/feature syntax requires direct dependency entries):
+ove-decode = { path = "engine-checkout/engine/ove-decode" }
+ove-encode = { path = "engine-checkout/engine/ove-encode" }
 
 [dev-dependencies]
 sha2 = "0.10"
