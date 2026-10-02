@@ -40,9 +40,18 @@ export AR_aarch64_linux_android="$TC/llvm-ar"
 export CC_aarch64_linux_android="$TC/aarch64-linux-android${API}-clang"
 export CXX_aarch64_linux_android="$TC/aarch64-linux-android${API}-clang++"
 export RANLIB_aarch64_linux_android="$TC/llvm-ranlib"
-# clang builtin headers (stddef.h etc.) come from the NDK's clang resource dir
-CLANG_RES="$TC/../lib/clang/18/include"
-export BINDGEN_EXTRA_CLANG_ARGS="--sysroot=$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot -I$FFPREFIX/include -I$CLANG_RES"
+# bindgen: cross-target via --target (lets the HOST libclang supply its own
+# builtin headers) + explicit NDK unified-sysroot include paths. This avoids
+# version-fragile clang resource-dir paths.
+SYSROOT="$NDK/toolchains/llvm/prebuilt/linux-x86_64/sysroot"
+# the host libclang's own builtin headers (stddef.h etc.) — discovered by
+# locating stddef.h inside the libclang tree (version-agnostic)
+HOST_RES=""
+if [ -n "${LIBCLANG_PATH:-}" ]; then
+    HOST_RES="$(dirname "$(dirname "$(find "$LIBCLANG_PATH" -maxdepth 4 -name stddef.h -path '*clang*' 2>/dev/null | head -1)")")"
+fi
+export BINDGEN_EXTRA_CLANG_ARGS="--target=aarch64-linux-android${API} -I$SYSROOT/usr/include -I$SYSROOT/usr/include/aarch64-linux-android -I$FFPREFIX/include -D__ANDROID_API__=${API}"
+[ -n "$HOST_RES" ] && export BINDGEN_EXTRA_CLANG_ARGS="$BINDGEN_EXTRA_CLANG_ARGS -resource-dir=$HOST_RES"
 export FFMPEG_DIR="$FFPREFIX"
 export PKG_CONFIG_ALLOW_CROSS=1
 export PKG_CONFIG_PATH="$FFPREFIX/lib/pkgconfig"
