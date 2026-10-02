@@ -1,0 +1,2 @@
+1f3481a9921e044d3f3aecd1c32c9aa8c6a454409387e9ca118adceb114bbda5  ove-studio-0.1.0-release-unsigned.apk
+bb9afad2e8bfb566a1fa67dbedc632f6f276517c58e7656ad09f26f5543071f7  ove-studio-0.1.0-release.aab
