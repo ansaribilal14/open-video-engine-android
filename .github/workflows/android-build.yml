@@ -1,0 +1,76 @@
+name: android-build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  release-build:
+    name: native bridge (aarch64) + release APK/AAB + checksums
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK + NDK
+        uses: android-actions/setup-android@v3
+      - name: Install NDK r27c
+        run: sdkmanager --install "ndk;27.2.12479018"
+
+      - name: Set up Rust (aarch64-linux-android)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Install libclang (bindgen) + pkg-config
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libclang-dev clang pkg-config curl xz-utils make
+
+      - name: Fetch FFmpeg 7.1.1 source
+        run: |
+          curl -sSLo /tmp/ffmpeg.tar.xz https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz
+          mkdir -p /tmp/ffsrc && tar xf /tmp/ffmpeg.tar.xz -C /tmp/ffsrc --strip-components=1
+
+      - name: Build FFmpeg for Android aarch64 (LGPL config)
+        env:
+          NDK: ${{ env.ANDROID_NDK_HOME }}
+          SRC: /tmp/ffsrc
+          PREFIX: /tmp/ffmpega64
+        run: sh scripts/ffmpeg-android.sh
+
+      - name: Fetch engine at pinned commit + build JNI bridge
+        env:
+          NDK: ${{ env.ANDROID_NDK_HOME }}
+          FFPREFIX: /tmp/ffmpega64
+        run: sh scripts/build-bridge-android.sh
+
+      - name: Release build (APK + AAB)
+        run: gradle assembleRelease bundleRelease --no-daemon
+
+      - name: Checksums + build metadata
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/*.apk dist/ 2>/dev/null || true
+          cp app/build/outputs/bundle/release/*.aab dist/ 2>/dev/null || true
+          cd dist
+          sha256sum * > SHA256SUMS.txt
+          {
+            echo "source_commit: $GITHUB_SHA"
+            echo "engine_pin: 06c92496f7051f15069663296ec51e88e170fe18"
+            echo "bridge_version: 0.1.0"
+            echo "app_version: 0.1.0"
+            echo "libav: FFmpeg 7.1.1 LGPL (aarch64)"
+          } > build-metadata.yml
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ove-studio-release
+          path: dist/
+          retention-days: 30

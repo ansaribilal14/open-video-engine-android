@@ -1,0 +1,64 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  kotlin:
+    name: kotlin unit tests + debug build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Kotlin unit tests + debug build
+        run: gradle testDebugUnitTest assembleDebug --no-daemon
+
+  bridge-host:
+    name: bridge host build + real-operation e2e (deterministic mpeg4 fixture)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install libav dev (FFmpeg 7.1.x) + ffmpeg CLI + libclang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libavcodec-dev libavformat-dev libavutil-dev \
+            libswscale-dev libswresample-dev libclang-dev clang pkg-config ffmpeg
+
+      - name: Fetch engine at pinned commit (read-only checkout)
+        run: sh bridge/fetch-engine.sh
+
+      - name: Bridge e2e — create/import/edits/undo/redo/render/export/reopen
+        run: |
+          cd bridge
+          cargo test --release --test e2e -- --nocapture
+
+      - name: Certified real-media gate (NASA source, optional)
+        env:
+          OVE_E2E_MEDIA: /tmp/source.mp4
+        run: |
+          # The certification-grade source (sha256 2d315daf…705f) is acquired
+          # out-of-band (see engine repo docs/REALWORLD_VALIDATION.md); when a
+          # cache artifact is attached to the run it is identity-gated and the
+          # H.264 typed-capability journey runs against it.
+          if [ -f "$OVE_TEST_MEDIA_CACHE" ]; then
+            cp "$OVE_TEST_MEDIA_CACHE" /tmp/source.mp4
+            sha256sum /tmp/source.mp4
+            cd bridge && cargo test --release --test e2e journey_h264_real_media
+          else
+            echo "NASA media cache not attached this run — journey skipped (recorded, not hidden)"
+          fi
