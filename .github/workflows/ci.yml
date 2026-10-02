@@ -9,6 +9,8 @@ jobs:
   kotlin:
     name: kotlin unit tests + debug build
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
     steps:
       - uses: actions/checkout@v4
 
@@ -18,11 +20,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Accept SDK licenses (preinstalled runner SDK)
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
       - name: Kotlin unit tests + debug build
-        run: gradle testDebugUnitTest assembleDebug --no-daemon
+        run: ./gradlew testDebugUnitTest assembleDebug --no-daemon
 
   bridge-host:
     name: bridge host build + real-operation e2e (deterministic mpeg4 fixture)

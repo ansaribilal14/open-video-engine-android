@@ -21,12 +21,19 @@ rustup target add aarch64-linux-android
 
 # 3. build (ffmpeg-sys-next discovers the Android FFmpeg prefix)
 # libclang for bindgen: prefer an explicitly provided path, then the
-# NDK's bundled libclang, then the unprivileged deb-extracted llvm-19.
+# NDK's bundled libclang, then deb-extracted llvm-19, then the system llvm.
 if [ -z "${LIBCLANG_PATH:-}" ]; then
     if ls "$TC"/../lib64/libclang* >/dev/null 2>&1; then
         export LIBCLANG_PATH="$TC/../lib64"
     elif [ -d "$HOME/my-project/ffmpeg-dev/usr/lib/llvm-19/lib" ]; then
         export LIBCLANG_PATH="$HOME/my-project/ffmpeg-dev/usr/lib/llvm-19/lib"
+    else
+        for d in /usr/lib/llvm-*/lib; do
+            if ls "$d"/libclang.so* >/dev/null 2>&1; then
+                export LIBCLANG_PATH="$d"
+                break
+            fi
+        done
     fi
 fi
 export AR_aarch64_linux_android="$TC/llvm-ar"

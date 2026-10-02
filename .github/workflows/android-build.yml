@@ -9,6 +9,9 @@ jobs:
   release-build:
     name: native bridge (aarch64) + release APK/AAB + checksums
     runs-on: ubuntu-latest
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      FFPREFIX: /tmp/ffmpega64
     steps:
       - uses: actions/checkout@v4
 
@@ -18,10 +21,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK + NDK
-        uses: android-actions/setup-android@v3
-      - name: Install NDK r27c
-        run: sdkmanager --install "ndk;27.2.12479018"
+      - name: Install NDK r27c (preinstalled runner SDK)
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install "ndk;27.2.12479018" > /dev/null
+          echo "NDK=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
 
       - name: Set up Rust (aarch64-linux-android)
         uses: dtolnay/rust-toolchain@stable
@@ -40,19 +44,14 @@ jobs:
 
       - name: Build FFmpeg for Android aarch64 (LGPL config)
         env:
-          NDK: ${{ env.ANDROID_NDK_HOME }}
           SRC: /tmp/ffsrc
-          PREFIX: /tmp/ffmpega64
         run: sh scripts/ffmpeg-android.sh
 
       - name: Fetch engine at pinned commit + build JNI bridge
-        env:
-          NDK: ${{ env.ANDROID_NDK_HOME }}
-          FFPREFIX: /tmp/ffmpega64
         run: sh scripts/build-bridge-android.sh
 
       - name: Release build (APK + AAB)
-        run: gradle assembleRelease bundleRelease --no-daemon
+        run: ./gradlew assembleRelease bundleRelease --no-daemon
 
       - name: Checksums + build metadata
         run: |
