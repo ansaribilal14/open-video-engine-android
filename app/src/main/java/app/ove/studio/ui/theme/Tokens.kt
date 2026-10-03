@@ -18,10 +18,22 @@ object Shape {
 
 // Timeline metrics (dp) — docs/UX_ARCHITECTURE.md §4.
 object TimelineMetrics {
-    const val rulerHeight = 20
-    const val trackHeight = 48
-    const val trackPitch = 48
+    const val rulerHeight = 22
+    const val trackHeight = 52
+    const val trackPitch = 52
     const val clipMargin = 2
+    const val clipCorner = 6      // CapCut-style rounded clip cards
     const val handleWidth = 14
+    const val playheadWidth = 2
     const val minTarget = 44
+}
+
+// Bottom tool-chip bar (CapCut signature row) — v0.1.2 tokens.
+object ToolBarMetrics {
+    const val barHeight = 68      // full chip row incl. labels
+    const val chipBox = 44        // icon tile edge
+    const val chipIcon = 22
+    const val chipCorner = 12
+    const val chipLabel = 10      // sp, applied at call site
+    const val chipGap = 6
 }

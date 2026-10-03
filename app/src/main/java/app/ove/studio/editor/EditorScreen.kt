@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.IosShare
@@ -53,9 +55,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import app.ove.studio.editor.components.ClipContextBar
 import app.ove.studio.editor.components.PreviewPane
 import app.ove.studio.editor.components.TimelineView
+import app.ove.studio.editor.components.ToolChipBar
+import app.ove.studio.editor.components.ToolChipSpec
 import app.ove.studio.editor.components.TransportBar
 import app.ove.studio.export.ExportSheet
 import app.ove.studio.ui.theme.OveTheme
@@ -137,21 +140,39 @@ fun EditorScreen(
                 )
             },
             bottomBar = {
-                EditorBottomBar(
-                    selected = state.selectedClipId != null,
-                    canUndo = state.canUndo,
-                    canRedo = state.canRedo,
-                    onImport = {
-                        pickMedia.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly),
-                        )
-                    },
-                    onSplit = { viewModel.splitSelectedAtPlayhead() },
-                    onDelete = { confirmDeleteClip = true },
-                    onUndo = { viewModel.undo() },
-                    onRedo = { viewModel.redo() },
-                    onExport = { showExport = true },
-                )
+                // CapCut signature: ONE scrollable tool-chip bar, always
+                // present; clip-scoped tools activate when a clip is selected.
+                Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
+                    ToolChipBar(
+                        chips = buildList {
+                            add(ToolChipSpec(Icons.Filled.Add, "Import", onClick = {
+                                pickMedia.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly),
+                                )
+                            }))
+                            if (state.selectedClipId != null) {
+                                add(ToolChipSpec(Icons.Filled.ContentCut, "Split", onClick = {
+                                    viewModel.splitSelectedAtPlayhead()
+                                }))
+                                if ((state.shape?.tracks?.size ?: 0) > 1) {
+                                    add(ToolChipSpec(Icons.Filled.ArrowUpward, "Track up", onClick = {
+                                        viewModel.moveSelectedToTrack(prevTrackOf(state))
+                                    }))
+                                    add(ToolChipSpec(Icons.Filled.ArrowDownward, "Track down", onClick = {
+                                        viewModel.moveSelectedToTrack(nextTrackOf(state))
+                                    }))
+                                }
+                                add(ToolChipSpec(Icons.Filled.Delete, "Delete", onClick = {
+                                    confirmDeleteClip = true
+                                }, danger = true))
+                            }
+                            add(ToolChipSpec(Icons.Filled.Undo, "Undo", onClick = { viewModel.undo() }, enabled = state.canUndo))
+                            add(ToolChipSpec(Icons.Filled.Redo, "Redo", onClick = { viewModel.redo() }, enabled = state.canRedo))
+                            add(ToolChipSpec(Icons.Filled.IosShare, "Export", onClick = { showExport = true }, accent = true))
+                        },
+                        modifier = Modifier.navigationBarsPadding(),
+                    )
+                }
             },
         ) { padding ->
             Column(Modifier.padding(padding).fillMaxSize()) {
@@ -188,11 +209,6 @@ fun EditorScreen(
                 }
                 TransportBar(state, viewModel)
                 TimelineView(state, viewModel)
-                ClipContextBar(
-                    state = state,
-                    viewModel = viewModel,
-                    onConfirmDelete = { confirmDeleteClip = true },
-                )
             }
         }
 
@@ -297,6 +313,24 @@ private fun BottomItem(action: BottomAction, modifier: Modifier = Modifier) {
             textAlign = TextAlign.Center,
         )
     }
+}
+
+// ---------------------------------------------------------------------------
+// Track-move helpers (contextual tools in the chip bar)
+// ---------------------------------------------------------------------------
+
+private fun prevTrackOf(state: app.ove.studio.editor.EditorState): Long {
+    val shape = state.shape ?: return 1
+    val cur = shape.tracks.indexOfFirst { t -> t.clips.any { it.id == state.selectedClipId } }
+    val ids = shape.tracks.map { it.id }
+    return ids[(cur - 1).coerceAtLeast(0)]
+}
+
+private fun nextTrackOf(state: app.ove.studio.editor.EditorState): Long {
+    val shape = state.shape ?: return 1
+    val cur = shape.tracks.indexOfFirst { t -> t.clips.any { it.id == state.selectedClipId } }
+    val ids = shape.tracks.map { it.id }
+    return ids[(cur + 1).coerceAtMost(ids.size - 1)]
 }
 
 @Composable

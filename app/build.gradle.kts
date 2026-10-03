@@ -13,8 +13,8 @@ android {
         applicationId = "app.ove.studio"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.1.2"
+        versionCode = 4
+        versionName = "0.1.3"
         ndk {
             // v0.1.0 build target (docs/ENGINE_INTEGRATION_AUDIT.md §13.3)
             abiFilters += listOf("arm64-v8a")

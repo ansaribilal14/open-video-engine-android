@@ -53,6 +53,19 @@ jobs:
       - name: Fetch engine at pinned commit + build JNI bridge
         run: sh scripts/build-bridge-android.sh
 
+      - name: 16KB page-size gate (dlopen compatibility on Android 15+ devices)
+        run: |
+          # v0.1.1 root-cause lesson: a 4KB-aligned liboveandroid.so fails to
+          # dlopen on 16KB-page kernels — the app loads but every engine call
+          # dies ("engine bridge failure", nothing created). Refuse to ship.
+          SO=app/src/main/jniLibs/arm64-v8a/liboveandroid.so
+          ALIGN="$(readelf -W -l "$SO" | awk '/ LOAD / {print $NF; exit}')"
+          echo "$SO LOAD alignment: $ALIGN"
+          case "$ALIGN" in
+            0x4000|0x8000|0x10000|0x20000) echo "16KB-compatible ✓" ;;
+            *) echo "::error::$SO LOAD alignment $ALIGN is NOT 16KB-compatible — refusing to publish"; exit 1 ;;
+          esac
+
       - name: Restore release keystore from secrets (never committed)
         env:
           KS_B64: ${{ secrets.OVE_ANDROID_KEYSTORE_BASE64 }}

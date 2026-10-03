@@ -55,7 +55,14 @@ export BINDGEN_EXTRA_CLANG_ARGS="--target=aarch64-linux-android${API} -I$SYSROOT
 export FFMPEG_DIR="$FFPREFIX"
 export PKG_CONFIG_ALLOW_CROSS=1
 export PKG_CONFIG_PATH="$FFPREFIX/lib/pkgconfig"
-export RUSTFLAGS="-L $FFPREFIX/lib -C linker=$TC/aarch64-linux-android${API}-clang"
+# 16KB PAGE-SIZE COMPATIBILITY (v0.1.2 root-cause fix for "engine bridge
+# failure" on Android 15+ 16KB-page devices): older rustc passes
+# -z max-page-size=4096 explicitly, producing LOAD segments aligned 0x1000;
+# dlopen then REJECTS the .so on 16KB kernels ("not compatible with 16KB page
+# size"). Last link-arg wins, so appending explicit 16KB args overrides any
+# rustc default on every toolchain. Verified post-build by reading the ELF
+# LOAD alignment (release.yml gate) — must be 16384.
+export RUSTFLAGS="-L $FFPREFIX/lib -C linker=$TC/aarch64-linux-android${API}-clang -C link-arg=-Wl,-z,max-page-size=16384 -C link-arg=-Wl,-z,common-page-size=16384"
 
 cd "$BRIDGE"
 cargo build --release --target aarch64-linux-android
