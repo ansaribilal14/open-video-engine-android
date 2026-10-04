@@ -28,3 +28,6 @@ keystore.properties
 
 # OS
 .DS_Store
+
+# Native bridge is built by CI at the pinned engine commit — never committed
+app/src/main/jniLibs/

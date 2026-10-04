@@ -19,6 +19,19 @@ The strict status vocabulary (IMPLEMENTED / INTEGRATED / TESTED / DEVICE-VERIFIE
 BLOCKED / UNSUPPORTED BY ENGINE) is enforced across docs and UI — see
 [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md) §4 for the full truth-annotated inventory.
 
+## v0.2.0 — release-integrity hardening (on top of the v0.1.3 bridge fix)
+
+- **Stale committed binary removed from git**: `app/src/main/jniLibs/` is now
+  gitignored; CI builds the bridge fresh at the pinned engine commit on every
+  run. A committed `.so` can silently drift from source again.
+- **Stricter 16KB gate (`scripts/check-16kb.sh`)**: verifies EVERY PT_LOAD
+  segment (the v0.1.3 readelf gate checked the first). Now also runs in the
+  push-triggered `android-build` workflow, and release additionally verifies
+  the .so extracted FROM the packaged APK plus `zipalign -P 16` page
+  alignment of the archive itself — the two halves of loadability.
+- Home/editor/UI fixes from v0.1.2/v0.1.3 (engine-first project creation,
+  self-healing registry, typed bridge errors) are inherited unchanged.
+
 ## Architecture (engine-first)
 
 ```

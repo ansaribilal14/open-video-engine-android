@@ -51,6 +51,9 @@ jobs:
       - name: Fetch engine at pinned commit + build JNI bridge
         run: sh scripts/build-bridge-android.sh
 
+      - name: 16KB gate — every PT_LOAD segment of the bridge .so (check-16kb.sh)
+        run: sh scripts/check-16kb.sh app/src/main/jniLibs/arm64-v8a/liboveandroid.so
+
       - name: Release build (APK + AAB)
         run: ./gradlew assembleRelease bundleRelease --no-daemon
 

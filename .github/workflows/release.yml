@@ -85,6 +85,17 @@ jobs:
           OVE_KEY_PASSWORD: ${{ secrets.OVE_ANDROID_KEY_PASSWORD }}
         run: ./gradlew assembleRelease bundleRelease --no-daemon
 
+      - name: 16KB gate on the PACKAGED APK + zip page-alignment (belt over braces)
+        run: |
+          # the pre-gradle gate checks the jniLibs ELF; this one checks what is
+          # actually inside the APK and that the zip itself page-aligns the
+          # uncompressed lib (zipalign -P 16) — the two halves of loadability.
+          APK=$(ls app/build/outputs/apk/release/*.apk)
+          rm -rf /tmp/apklib && unzip -o -j "$APK" 'lib/arm64-v8a/liboveandroid.so' -d /tmp/apklib >/dev/null
+          sh scripts/check-16kb.sh /tmp/apklib/liboveandroid.so
+          ZIPALIGN="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)zipalign"
+          "$ZIPALIGN" -c -P 16 4 "$APK"
+
       - name: Verify APK signature (never publish unsigned — v0.1.0 lesson)
         run: |
           APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
